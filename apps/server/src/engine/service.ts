@@ -349,6 +349,7 @@ export class AgentService {
       {
         status: "queued",
         question: null,
+        suggestions: null,
         input: { ...task.input, ...(fields ? { fields } : {}) },
         state: { ...task.state, answer },
         updatedAt: date(),
@@ -994,7 +995,7 @@ export class AgentService {
       });
       await ctx.event("step", "Found the document", file.name);
     }
-    const fields = z
+    let fields = z
       .record(z.string(), z.union([z.string(), z.boolean()]))
       .optional()
       .parse(task.input.fields);
@@ -1008,15 +1009,36 @@ export class AgentService {
         throw new Error(
           "This PDF has no supported fillable fields. Open it in Files to review it.",
         );
-      return {
-        status: "waiting_input",
-        question: `Enter the form values you want to use. Supported fields: ${names}. The original PDF will stay intact.`,
+      const draft = Object.fromEntries(
+        (file.fields ?? [])
+          .filter((f) => f.type !== "unsupported")
+          .map((f) => [f.name, f.type === "checkbox" ? false : `[${f.name}]`]),
+      );
+      const filled = await this.files.fill(owner, source.fileId, draft, `document:${task.id}`);
+      task = await ctx.checkpoint({
+        artifactIds: [...new Set([...task.artifactIds, filled.id])],
         state: {
           ...task.state,
           source,
-          missingFields: file.fields?.filter((f) => f.type !== "unsupported"),
+          filledId: filled.id,
+          assumptions: [
+            ...((Array.isArray(task.state.assumptions) ? task.state.assumptions : []) as unknown[]),
+            {
+              question: "Missing PDF field values",
+              assumed: "Filled supported fields with placeholders for user review.",
+              fields: Object.keys(draft),
+              at: date(),
+            },
+          ].slice(-20),
         },
-      };
+        plan: task.plan.map((s, i) => ({ ...s, status: i <= 1 ? "succeeded" : "pending" })),
+      });
+      await ctx.event(
+        "step",
+        "Saved a draft filled copy",
+        `No field values were provided; filled ${Object.keys(draft).length} supported fields with placeholders.`,
+      );
+      fields = draft;
     }
     let filledId = typeof task.state.filledId === "string" ? task.state.filledId : undefined;
     if (!filledId) {

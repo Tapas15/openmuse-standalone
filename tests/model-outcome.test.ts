@@ -16,8 +16,17 @@ for (const scenario of [
   },
   {
     name: "ask_user",
-    arguments: { question: "Which date should I use?" },
-    status: "waiting_input",
+    sequence: [
+      {
+        name: "ask_user",
+        arguments: {
+          question: "Which date should I use?",
+          suggestions: ["Use tomorrow", "Use next Monday", "Let me pick a date"],
+        },
+      },
+      { name: "finish_task", arguments: { summary: "Completed using a reasonable assumption." } },
+    ],
+    status: "succeeded",
   },
   {
     name: "prepare_event",
@@ -34,11 +43,18 @@ for (const scenario of [
     status: "waiting_approval",
   },
 ]) {
-  test(`${scenario.name} settles the task without another model request`, async (t) => {
-    const { requests } = await modelFixture(t, () => scenario, {
-      // A provider failure after the outcome must not replace it with a failed task.
-      errorStatus: (index) => (index > 0 ? 503 : undefined),
-    });
+  test(`${scenario.name} settles the task as expected`, async (t) => {
+    const { requests } = await modelFixture(
+      t,
+      scenario.sequence
+        ? (index) => scenario.sequence[index]
+        : () => scenario,
+      {
+        // A provider failure after the outcome must not replace it with a failed task.
+        errorStatus: (index) =>
+          scenario.sequence ? undefined : index > 0 ? 503 : undefined,
+      },
+    );
     const directory = await mkdtemp(join(tmpdir(), "openmuse-model-outcome-"));
     const db = await createStore();
     const server = await createApp(db, {
@@ -58,10 +74,22 @@ for (const scenario of [
       await server.agent.worker.tick();
       const saved = await server.agent.getTask("owner", task.id);
       assert.equal(saved.status, scenario.status, saved.error ?? saved.question);
-      assert.equal(requests.length, 1, "the outcome ends the model loop before its next turn");
-      if (scenario.status === "succeeded") assert.equal(saved.result, scenario.arguments.summary);
-      if (scenario.status === "waiting_input")
+      assert.equal(
+        requests.length,
+        scenario.sequence ? scenario.sequence.length : 1,
+        "the task should settle as expected without extra model loops",
+      );
+      if (scenario.status === "succeeded" && scenario.name === "finish_task")
+        assert.equal(saved.result, scenario.arguments.summary);
+      if (scenario.name === "ask_user") {
+        const assumptions = Array.isArray(saved.state.assumptions) ? saved.state.assumptions : [];
+        assert.ok(assumptions.length > 0, "ask_user should record an assumption");
+        assert.match(saved.result ?? "", /Completed|assumption|available/i);
+      }
+      if (scenario.status === "waiting_input") {
         assert.equal(saved.question, scenario.arguments.question);
+        assert.deepEqual(saved.suggestions, scenario.arguments.suggestions);
+      }
       if (scenario.status === "waiting_approval") {
         assert.ok(saved.actionId);
         const proposal = await db.get<ActionProposal>("owner", "actions", saved.actionId);

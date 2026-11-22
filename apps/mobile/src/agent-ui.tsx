@@ -281,6 +281,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
   const [fieldJson, setFieldJson] = useState("");
   const [showFieldJson, setShowFieldJson] = useState(false);
   const [fields, setFields] = useState<Record<string, string | boolean>>({});
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const task = data?.tasks.find((item) => item.id === taskId) || detail?.task;
   const milestone = data?.goals
     .find((goal) => goal.id === task?.goalId)
@@ -452,6 +453,20 @@ export function TaskDetail({ taskId }: { taskId: string }) {
           {task.status === "waiting_input" && (
             <Card style={{ backgroundColor: colors.sky, gap: 10 }}>
               <Text style={s.heading}>{task.question || "A detail from you will help"}</Text>
+              {!!task.suggestions?.length && (
+                <View style={{ gap: 8 }}>
+                  {task.suggestions.slice(0, 4).map((suggestion, index) => (
+                    <Button
+                      key={`${index}-${suggestion}`}
+                      small
+                      busy={busy}
+                      onPress={() => void act("input", { answer: suggestion })}
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </View>
+              )}
               {fieldNames.map((name) =>
                 missing.some(
                   (f) => typeof f === "object" && f && f.name === name && f.type === "checkbox",
@@ -475,11 +490,11 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               )}
               {!fieldNames.length && (
                 <Field
-                  label="Your answer"
+                  label="Or type your own answer"
                   value={answer}
                   onChangeText={setAnswer}
                   multiline
-                  placeholder="Add the missing details…"
+                  placeholder="Add your own details…"
                 />
               )}
               {task.kind === "document" && !fieldNames.length && (
@@ -595,7 +610,13 @@ export function TaskDetail({ taskId }: { taskId: string }) {
           {!!task.evidence.length && (
             <View style={{ gap: 14 }}>
               <Text style={s.heading}>Sources</Text>
-              <EvidenceList items={task.evidence} />
+              <Text style={s.muted}>
+                {task.evidence.length} source{task.evidence.length === 1 ? "" : "s"} used. Open details only if needed.
+              </Text>
+              <Button small onPress={() => setSourcesExpanded((v) => !v)}>
+                {sourcesExpanded ? "Hide sources" : "Show sources"}
+              </Button>
+              {sourcesExpanded ? <EvidenceList items={task.evidence} /> : null}
             </View>
           )}
           <Text style={s.heading}>Timeline</Text>
@@ -638,7 +659,19 @@ function display(value: unknown): string {
 export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
   const [expanded, setExpanded] = useState(false);
   if (artifact.kind === "finance") return <FinanceArtifact artifact={artifact} />;
-  const rows = Object.entries(artifact.data);
+  const data = record(artifact.data);
+  const presentation = typeof data?.presentation === "string" ? data.presentation : "";
+  const highlights = Array.isArray(data?.highlights)
+    ? data.highlights.filter((v): v is string => typeof v === "string").slice(0, 12)
+    : [];
+  const sections = Array.isArray(data?.sections)
+    ? data.sections
+        .map((v) => record(v))
+        .filter((v): v is Record<string, unknown> => !!v)
+        .slice(0, 12)
+    : [];
+  const hiddenKeys = new Set(["presentation", "highlights", "sections", "evidence"]);
+  const rows = Object.entries(artifact.data).filter(([key]) => !hiddenKeys.has(key));
   return (
     <Card style={{ gap: 13, backgroundColor: colors.card }}>
       <View style={s.between}>
@@ -648,50 +681,86 @@ export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
       <Text selectable style={s.muted}>
         {artifact.summary}
       </Text>
-      {(expanded ? rows : rows.slice(0, 4)).map(([key, value]) => (
-        <View key={key} style={{ gap: 6 }}>
-          <Text style={s.label}>{key.replace(/_/g, " ")}</Text>
-          {Array.isArray(value) ? (
-            value.slice(0, expanded ? 100 : 5).map((item) => {
-              const row = record(item);
-              return (
-                <View
-                  key={`${key}-${display(row?.id ?? item)}`}
-                  style={{
-                    paddingVertical: 8,
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.line,
-                  }}
-                >
-                  <Text selectable style={s.text}>
-                    {row
-                      ? Object.entries(row)
-                          .map(([name, val]) => `${name}: ${display(val)}`)
-                          .join(" · ")
-                      : display(item)}
-                  </Text>
-                </View>
-              );
-            })
-          ) : record(value) ? (
-            Object.entries(record(value) || {}).map(([name, val]) => (
-              <View key={name} style={s.between}>
-                <Text style={s.muted}>{name}</Text>
-                <Text selectable style={s.text}>
-                  {display(val)}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <Text selectable style={[s.text, { fontSize: typeof value === "number" ? 24 : 14 }]}>
-              {display(value)}
+      {presentation ? (
+        <Text selectable style={s.text}>
+          {presentation}
+        </Text>
+      ) : null}
+      {highlights.length ? (
+        <View style={{ gap: 6 }}>
+          <Text style={s.label}>Highlights</Text>
+          {highlights.map((item, index) => (
+            <Text key={`${index}-${item.slice(0, 24)}`} selectable style={s.text}>
+              • {item}
             </Text>
-          )}
+          ))}
         </View>
-      ))}
-      <Button small onPress={() => setExpanded(!expanded)}>
-        {expanded ? "Show summary" : "Explore full result"}
-      </Button>
+      ) : null}
+      {sections.map((section, index) => {
+        const title = typeof section.title === "string" ? section.title : `Section ${index + 1}`;
+        const items = Array.isArray(section.items)
+          ? section.items.filter((v): v is string => typeof v === "string").slice(0, 12)
+          : [];
+        if (!items.length) return null;
+        return (
+          <View key={`${title}-${index}`} style={{ gap: 6 }}>
+            <Text style={s.label}>{title}</Text>
+            {items.map((item, itemIndex) => (
+              <Text key={`${itemIndex}-${item.slice(0, 24)}`} selectable style={s.text}>
+                • {item}
+              </Text>
+            ))}
+          </View>
+        );
+      })}
+      {expanded
+        ? rows.map(([key, value]) => (
+            <View key={key} style={{ gap: 6 }}>
+              <Text style={s.label}>{key.replace(/_/g, " ")}</Text>
+              {Array.isArray(value) ? (
+                value.slice(0, 100).map((item) => {
+                  const row = record(item);
+                  return (
+                    <View
+                      key={`${key}-${display(row?.id ?? item)}`}
+                      style={{
+                        paddingVertical: 8,
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.line,
+                      }}
+                    >
+                      <Text selectable style={s.text}>
+                        {row
+                          ? Object.entries(row)
+                              .map(([name, val]) => `${name}: ${display(val)}`)
+                              .join(" · ")
+                          : display(item)}
+                      </Text>
+                    </View>
+                  );
+                })
+              ) : record(value) ? (
+                Object.entries(record(value) || {}).map(([name, val]) => (
+                  <View key={name} style={s.between}>
+                    <Text style={s.muted}>{name}</Text>
+                    <Text selectable style={s.text}>
+                      {display(val)}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text selectable style={[s.text, { fontSize: typeof value === "number" ? 24 : 14 }]}>
+                  {display(value)}
+                </Text>
+              )}
+            </View>
+          ))
+        : null}
+      {rows.length ? (
+        <Button small onPress={() => setExpanded(!expanded)}>
+          {expanded ? "Show summary" : "Show details"}
+        </Button>
+      ) : null}
     </Card>
   );
 }

@@ -45,6 +45,7 @@ export interface AgentTask {
   result?: string;
   error?: string | null;
   question?: string;
+  suggestions?: string[];
   artifactIds: string[];
 }
 export interface RunEvent {
