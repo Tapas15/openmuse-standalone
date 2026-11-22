@@ -4,17 +4,17 @@
 
 **Self-hosted OpenMuse: a personal AI agent whose conversations live in your own Postgres, not a hosted chat cloud.**
 
-*个人 AI agent 的独立版：对话存在你自己的 Postgres 里，不依赖托管聊天云。*
+*A standalone personal AI agent: conversations live in your own Postgres, no hosted chat cloud required.*
 
 **Standalone is the open-source root of [Yuki](https://github.com/caspianchan31/yuki)**: AI teammates, each with its own computer.<br>
-*Standalone 是 [Yuki](https://github.com/caspianchan31/yuki) 的开源底座。Yuki：每个都有自己电脑的 AI 成员。*
+*Standalone is the open-source foundation of [Yuki](https://github.com/caspianchan31/yuki). Yuki: AI teammates, each with their own computer.*
 
 [![CI](https://github.com/caspianchan31/openmuse-standalone/actions/workflows/ci.yml/badge.svg)](https://github.com/caspianchan31/openmuse-standalone/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/caspianchan31/openmuse-standalone)](https://github.com/caspianchan31/openmuse-standalone/releases)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 
-[Quick start](#quick-start-no-key) · [Upstream vs Standalone](#upstream-vs-standalone) · [Postgres guide](docs/POSTGRES.md) · [Known limits](#known-limits) · [How it is built](docs/STANDALONE.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [中文](#中文)
+[Quick start](#quick-start-no-key) · [Upstream vs Standalone](#upstream-vs-standalone) · [Postgres guide](docs/POSTGRES.md) · [Known limits](#known-limits) · [How it is built](docs/STANDALONE.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 <img src="assets/openmuse-demo.gif" alt="OpenMuse running on iPhone in the fictional sample workspace: chat, agent computer, files, a PDF form, a finance summary, goals and ideas" width="300">
 
@@ -169,58 +169,58 @@ CopilotKit Intelligence is a separate service and is not part of this repository
 
 ---
 
-## 中文
+## English summary
 
-**OpenMuse 独立版：整套跑在自己的服务器上，不依赖第三方聊天云。**
+**OpenMuse Standalone: runs entirely on your own server, no third-party chat cloud required.**
 
-上游 OpenMuse 的聊天层把所有对话存在 CopilotKit Intelligence 托管服务里：它一挂，你就没法和 agent 说话；对话文本也在别人的服务器上。本分支把聊天层收回自己手里（Postgres 存线程、服务端直接用 SSE 流式回浏览器），其余功能与上游一致，持续跟进上游。设置了 `CPK_INTELLIGENCE_API_KEY` 时，行为与上游完全相同。
+Upstream OpenMuse stores its chat layer in the CopilotKit Intelligence hosted service: if it goes down, you cannot talk to your agent; conversation text also lives on someone else’s servers. This fork brings the chat layer back under your control (Postgres stores threads, the server streams replies to the browser via SSE). All other features remain consistent with upstream and continue to track upstream. When `CPK_INTELLIGENCE_API_KEY` is set, behavior is identical to upstream.
 
-**现状**：v0.1.0，2026-10-11 发布，alpha（与上游一致）。基于上游 `main` 的 `1ac68f3`（2026-10-06）。上游完整说明见 [docs/UPSTREAM-README.md](docs/UPSTREAM-README.md)。
+**Status**: v0.1.0, released 2026-10-11, alpha (same as upstream). Based on upstream `main` at `1ac68f3` (2026-10-06). See the full upstream guide at [docs/UPSTREAM-README.md](docs/UPSTREAM-README.md).
 
-### 快速开始（不需要 key）
+### Quick start (no key required)
 
-需要 Node 24 LTS 和 pnpm 11.19.0；示例工作区不需要模型、Google 账号、Docker 或 Intelligence key。
+Requires Node 24 LTS and pnpm 11.19.0; the sample workspace does not need a model, Google account, Docker, or Intelligence key.
 
 ```sh
 git clone https://github.com/caspianchan31/openmuse-standalone.git openmuse
 cd openmuse
 pnpm install --frozen-lockfile
-cp .env.example .env   # 不要设置 CPK_INTELLIGENCE_API_KEY
-pnpm dev               # API：http://localhost:8787
-pnpm dev:web           # 另开一个终端，应用：http://localhost:8081
+cp .env.example .env   # do not set CPK_INTELLIGENCE_API_KEY
+pnpm dev               # API: http://localhost:8787
+pnpm dev:web           # in another terminal, app: http://localhost:8081
 ```
 
-生产环境：`pnpm build:server && pnpm start`；网页用 `pnpm build:web`（构建时设 `EXPO_PUBLIC_API_URL`）。对外开放的服务器需要 live 模式（`WORKSPACE_MODE=live`、`OPENMUSE_ACCESS_KEY`、`TOKEN_ENCRYPTION_KEY`）和模型配置，见上游说明。
+Production: `pnpm build:server && pnpm start`; build the web app with `pnpm build:web` (set `EXPO_PUBLIC_API_URL` during build). A server exposed to the public needs live mode (`WORKSPACE_MODE=live`, `OPENMUSE_ACCESS_KEY`, `TOKEN_ENCRYPTION_KEY`) and model configuration; see the upstream guide.
 
-### 环境变量
+### Environment variables
 
-- `CPK_INTELLIGENCE_API_KEY`：不设或留空即**本地模式**，对话存在本服务器数据库；设置后走上游 Intelligence 模式，行为不变。key 填错会报错，不会退回本地模式。
-- `DATABASE_URL`：不设则用内嵌 PGlite（`DATA_DIR/postgres`）；设置则连该 Postgres。
-- `DATA_DIR`：默认 `.openmuse`，存数据库、文件、签名密钥，需自行备份。
-- `CHAT_RETENTION_DAYS`：仅本地模式，删除超过该天数的已完成回复（1–36500 的整数）；不设则永久保留。
+- `CPK_INTELLIGENCE_API_KEY`: leave unset or blank for **local mode**, where conversations live in this server’s database; when set, uses upstream Intelligence mode with unchanged behavior. A wrong key reports an error and does not fall back to local mode.
+- `DATABASE_URL`: unset uses embedded PGlite (`DATA_DIR/postgres`); when set, connects to that Postgres.
+- `DATA_DIR`: defaults to `.openmuse`; stores database, files, and signing keys; back it up yourself.
+- `CHAT_RETENTION_DAYS`: local mode only; deletes completed replies older than this many days (integer 1–36500); unset keeps them forever.
 
-### PGlite 与 Postgres
+### PGlite vs Postgres
 
-- **PGlite（默认）**：免安装；数据库只能被一个进程打开，任务 worker 跑在 API 进程里。崩溃中断的回复在 API 重启时立即恢复。
-- **Postgres**：长期使用推荐；可让独立任务 worker 共用。崩溃中断的回复在锁过期后约 30–45 秒内恢复。配置 `DATABASE_URL` 的分步说明见 [docs/POSTGRES.md](docs/POSTGRES.md)（英文）。
+- **PGlite (default)**: no installation needed; the database can only be opened by one process, so the task worker runs in the API process. Replies interrupted by a crash recover immediately on API restart.
+- **Postgres**: recommended for long-term use; allows a separate task worker to share it. Replies interrupted by a crash recover after the lock expires, about 30–45 seconds. For step-by-step `DATABASE_URL` setup, see [docs/POSTGRES.md](docs/POSTGRES.md).
 
-### 有无 key 的区别
+### With and without the key
 
-不设 key：对话、线程菜单（列出、改名、归档、恢复）、主对话都由本服务器提供（删除线程走 `DELETE /api/copilotkit/threads/:id`）；刷新会重放对话，回复中途刷新会接着播；回复进行中再发消息返回 `409 agent_thread_locked`，应用把消息暂存。设置 key：全部走 Intelligence，与上游一致，另有跨设备实时线程列表。
+Without key: conversations, thread menu (list, rename, archive, restore), and main conversation are all served by this server (thread deletion uses `DELETE /api/copilotkit/threads/:id`); refresh replays the conversation, and refreshing mid-reply resumes playback; sending a message while a reply is in progress returns `409 agent_thread_locked`, and the app stages the message. With key: everything goes through Intelligence, same as upstream, with cross-device real-time thread lists.
 
-### 从云端迁移
+### Migrating from the cloud
 
-去掉 `CPK_INTELLIGENCE_API_KEY` 后重启即可。**云端已有的线程不会自动导入**，仍留在 Intelligence，重新设 key 就能看到；本地模式下主对话 id 不变但从空白开始。本地保存的对话也不会上传到 Intelligence。
+Remove `CPK_INTELLIGENCE_API_KEY` and restart. **Existing cloud threads are not imported automatically**; they remain in Intelligence and reappear if you set the key again. In local mode the main conversation id stays the same but starts blank. Conversations saved locally are not uploaded to Intelligence.
 
-### 仍会离开服务器的数据
+### Data that still leaves the server
 
-模型调用（发往你配置的模型商）；公共网页搜索默认走 Parallel（`WEB_SEARCH_ENABLED=false` 关闭）；CopilotKit SDK 遥测默认开启（`COPILOTKIT_TELEMETRY_DISABLED=true` 或 `DO_NOT_TRACK=1` 关闭）；Gmail、日历、E2B 云桌面仅在你启用时使用。
+Model calls (sent to the model provider you configure); public web search defaults to Parallel (`WEB_SEARCH_ENABLED=false` to disable); CopilotKit SDK telemetry is enabled by default (`COPILOTKIT_TELEMETRY_DISABLED=true` or `DO_NOT_TRACK=1` to disable); Gmail, Calendar, and E2B cloud desktop are used only when you enable them.
 
-### 已知限制
+### Known limitations
 
-- **不支持跨设备实时同步线程元数据**：其他设备的线程列表在打开菜单时刷新。
-- **单实例运行锁**：只运行一个 API 进程；回复只能从正在运行它的进程实时续播。
-- 因另一台设备正在回复而暂存的消息，稍后会带着本设备的对话副本发送，模型看不到另一台设备那一轮（保存的历史顺序正确，刷新可见）。
-- 本地模式不提供 Memories；两种模式都不自动命名线程（与上游一致）。
+- **No cross-device real-time thread metadata sync**: other devices refresh the thread list when opening the menu.
+- **Single-instance run lock**: run only one API process; replies can only resume live from the process running them.
+- A message staged because another device was replying will be sent later with this device’s conversation copy; the model won’t see that turn from the other device (saved history order is correct, visible on refresh).
+- Local mode does not provide Memories; neither mode auto-names threads (same as upstream).
 
-架构与跟进上游的方法见 [docs/STANDALONE.zh-CN.md](docs/STANDALONE.zh-CN.md)（英文原文：[docs/STANDALONE.md](docs/STANDALONE.md)）。MIT 许可，与上游相同；CopilotKit Intelligence 是独立服务，不在本仓库及其 MIT 许可范围内。
+For architecture and how to track upstream, see [docs/STANDALONE.zh-CN.md](docs/STANDALONE.zh-CN.md) (English original: [docs/STANDALONE.md](docs/STANDALONE.md)). MIT licensed, same as upstream; CopilotKit Intelligence is a separate service, not within this repository or its MIT license scope.
