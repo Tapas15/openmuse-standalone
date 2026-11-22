@@ -1,0 +1,7 @@
+downloads/
+installer/*.deb
+installer/*.AppImage
+installer/*.exe
+*.log
+.DS_Store
+Thumbs.db

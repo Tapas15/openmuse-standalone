@@ -1,0 +1,27 @@
+services:
+  browseros:
+    build:
+      context: .
+      args:
+        # Auto-downloads if ./installer/ has no local .deb/.AppImage.
+        BROWSEROS_INSTALLER_URL: "${BROWSEROS_INSTALLER_URL:-https://cdn.browseros.com/download/BrowserOS_neo.deb}"
+        BROWSEROS_APPIMAGE_URL: "${BROWSEROS_APPIMAGE_URL:-https://cdn.browseros.com/download/BrowserOS_neo.AppImage}"
+    container_name: browseros-original
+    ports:
+      - "127.0.0.1:6080:6080" # noVNC web GUI
+      - "127.0.0.1:5900:5900" # raw VNC client
+      - "127.0.0.1:9010:9015" # BrowserOS MCP (bridged to loopback-bound service)
+      - "127.0.0.1:9011:9016" # BrowserOS MCP secondary (bridged)
+    environment:
+      # Virtual desktop size (WIDTHxHEIGHTxDEPTH). Change to fit your screen.
+      RESOLUTION: "${RESOLUTION:-1600x900x24}"
+      # Optional: set if auto-detection fails
+      # BROWSEROS_BIN: "/usr/bin/browseros"
+    volumes:
+      - browseros-data:/home/browser/data
+      - ./downloads:/downloads
+    shm_size: "1gb"
+    restart: unless-stopped
+
+volumes:
+  browseros-data:
